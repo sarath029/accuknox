@@ -12,6 +12,8 @@ from rest_framework import status
 from .models import FriendRequest, Friends
 from .serializers import FriendRequestSerializer
 from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
+from django_ratelimit.decorators import ratelimit
 
 
 class UserRegistrationVS(APIView):
@@ -44,6 +46,9 @@ class UserSearchVS(generics.ListAPIView):
         return User.objects.all()
 
 
+@method_decorator(
+    ratelimit(key="user", rate="3/m", method="POST", block=True), name="create"
+)
 class FriendRequestVS(generics.CreateAPIView):
     serializer_class = FriendRequestSerializer
 
@@ -54,14 +59,14 @@ class FriendRequestVS(generics.CreateAPIView):
         receiver = get_object_or_404(User, pk=receiver_id)
 
         connection_exists_1 = Friends.objects.filter(
-            user_1=sender, user2=receiver
+            user1=sender, user2=receiver
         ).exists()
         connection_exists_2 = Friends.objects.filter(
-            user_1=receiver, user2=sender
+            user1=receiver, user2=sender
         ).exists()
         if connection_exists_1 or connection_exists_2:
             return Response(
-                {"detail": "You are already connected"},
+                prepare_error_response("You are already connected"),
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -70,7 +75,7 @@ class FriendRequestVS(generics.CreateAPIView):
         ).exists()
         if existing_request:
             return Response(
-                {"detail": "A friend request already exists between these users."},
+                prepare_error_response("A friend request already exists."),
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -80,7 +85,9 @@ class FriendRequestVS(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save(sender=sender, receiver=receiver)
 
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(
+            prepare_success_response(serializer.data), status=status.HTTP_201_CREATED
+        )
 
 
 class FriendRequestActionVS(generics.UpdateAPIView):
@@ -92,23 +99,31 @@ class FriendRequestActionVS(generics.UpdateAPIView):
 
         receiver = request.user
         sender = get_object_or_404(User, pk=sender_id)
-        existing_request = FriendRequest.objects.get(
-            sender=sender, receiver=receiver, status=FriendRequest.PENDING
-        )
+
+        try:
+            existing_request = FriendRequest.objects.get(
+                sender=sender, receiver=receiver, status=FriendRequest.PENDING
+            )
+        except:
+            return Response(
+                prepare_error_response("Invalid Request, No FriendRequest exists"),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if action.upper() == "ACCEPTED":
             existing_request.status = FriendRequest.ACCEPTED
             existing_request.save()
-            Friends.objects.create(user_1=sender, user_2=receiver)
+            Friends.objects.create(user1=sender, user2=receiver)
         elif action.upper() == "REJECTED":
             existing_request.status = FriendRequest.REJECTED
             existing_request.save()
             Friends.objects.create(user1=sender, user2=receiver)
         else:
             return Response(
-                {"detail": "Invalid Actoon."}, status=status.HTTP_400_BAD_REQUEST
+                prepare_error_response("Invalid Action"),
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        return Response(status=status.HTTP_201_CREATED)
+        return Response(prepare_success_response(), status=status.HTTP_201_CREATED)
 
 
 class FriendRequestListVS(generics.ListAPIView):
@@ -118,3 +133,15 @@ class FriendRequestListVS(generics.ListAPIView):
     def get_queryset(self):
         receiver = self.request.user
         return FriendRequest.objects.filter(receiver=receiver)
+
+
+class FriendListVS(generics.ListAPIView):
+    serializer_class = UserSerializer
+    pagination_class = PageNumberPagination
+
+    def get_queryset(self):
+        user = self.request.user
+        user_list = Friends.objects.filter(Q(user1=user) | Q(user2=user)).values_list(
+            "id"
+        )
+        return User.objects.filter(id__in=user_list)

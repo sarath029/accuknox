@@ -1,0 +1,12 @@
+[tool.black]
+line-length = 88
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+default_section = "FIRSTPARTY"
+known_first_party = ["exchange]
+known_third_party = ["boto3", "botocore", "celery", "cryptography", "dashboard", "django", "django_cron", "django_rest_passwordreset", "dotenv", "drf_yasg", "factory", "gspread", "openpyxl", "phonenumbers", "pytz", "requests", "rest_framework", "rest_framework_api_key", "rest_framework_simplejwt", "swagger", "xmltodict", "yattag"]
+skip_glob = ["*/migrations/*.py"]

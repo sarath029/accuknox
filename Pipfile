@@ -5,11 +5,10 @@ name = "pypi"
 
 [packages]
 django = "==4.2.5"
-black = "*"
-pip = "*"
-install = "*"
-djangorestframework = "*"
-djangorestframework-simplejwt = "*"
+djangorestframework-simplejwt = "==5.3.0"
+django-ratelimit = "==4.1.0"
+djangorestframework = "==3.14.0"
+pre-commit = "==2.19.0"
 
 [dev-packages]
 

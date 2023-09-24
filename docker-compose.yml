@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:13-alpine
+    environment:
+      - POSTGRES_DB=accuknox
+      - POSTGRES_USER=accuknox
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+  
+  backend_1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: /start
+    restart: on-failure
+    volumes:
+      - .:/code
+    environment:
+      - DB_HOST=accuknox
+      - DB_NAME=accuknox
+      - DB_USER=accuknox
+      - DB_PASSWORD=password\
+    ports:
+      - "8000:8000"
+
+volumes:
+  db:
